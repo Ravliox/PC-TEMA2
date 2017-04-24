@@ -14,7 +14,9 @@ typedef struct {
 	int pin;
 	char secret_pass[16];
 	float sold;
-	int login = 0; 
+	int login;
+	int counter;
+	int socket;
 } client;
 
 #define MAX_CLIENTS	5
@@ -26,10 +28,38 @@ void error(char *msg)
     exit(1);
 }
 
+int find_card (client* client_list, int user_count, int number){
+	for (int i = 0; i < user_count; i++){
+		if (client_list[i].card_no == number){
+			return i;
+		}
+	}
+	return -1;
+}
+
+int find_pin (client* client_list, int user_count, int pin){
+	for (int i = 0; i < user_count; i++){
+		if (client_list[i].pin == pin){
+			return i;
+		}
+	}
+	return -1;
+}
+
+int find_socket (client* client_list, int user_count, int socket){
+	for (int i = 0; i < user_count; i++){
+		if (client_list[i].socket == socket){
+			return i;
+		}
+	}
+	return -1;
+} 
+
 int main(int argc, char *argv[])
 {
-     int sockfd, newsockfd, portno, clilen;
+     int sockfd, SOCK_UTP, newsockfd, portno, clilen;
      char buffer[BUFLEN];
+	 char send_buffer[BUFLEN];
      struct sockaddr_in serv_addr, cli_addr;
      int n, i, j, user_count, k;
 
@@ -58,6 +88,9 @@ int main(int argc, char *argv[])
 		client_list[k].pin = atoi (data[3]);
 		strcpy (client_list[k].secret_pass, data[4]);
 		client_list[k].sold = atof (data[5]);
+		client_list[k].login = 0;
+		client_list[k].counter = 1;
+		client_list[k].socket = -1;
 		k++; 
 	 }
 
@@ -67,7 +100,8 @@ int main(int argc, char *argv[])
 		 printf ("%d ", client_list[p].card_no);
 		 printf ("%d ", client_list[p].pin);
 		 printf ("%s ", client_list[p].secret_pass);
-		 printf ("%f\n", client_list[p].sold);
+		 printf ("%f ", client_list[p].sold);
+		 printf ("%d\n", client_list[p].login);
 	 }
 
      fd_set read_fds;	//multimea de citire folosita in select()
@@ -84,6 +118,7 @@ int main(int argc, char *argv[])
      FD_ZERO(&tmp_fds);
      
      sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	 SOCK_UTP = socket (AF_INET, SOCK_DGRAM, 0);
      if (sockfd < 0) 
         error("ERROR opening socket");
      
@@ -95,6 +130,8 @@ int main(int argc, char *argv[])
      serv_addr.sin_port = htons(portno);
      
      if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(struct sockaddr)) < 0) 
+              error("ERROR on binding");
+	 if (bind(SOCK_UTP, (struct sockaddr *) &serv_addr, sizeof(struct sockaddr)) < 0) 
               error("ERROR on binding");
      
      listen(sockfd, MAX_CLIENTS);
@@ -146,18 +183,136 @@ int main(int argc, char *argv[])
 					
 					else { //recv intoarce >0
 						printf ("Am primit de la clientul de pe socketul %d, mesajul: %s\n", i, buffer);
+						memset(send_buffer, 0 , BUFLEN);
 						char* tokens = strtok (buffer, " ");
-						while (tokens != NULL){
-							printf ("%s\n", tokens);
+						if (strcmp (tokens, "login") == 0){
+							printf ("%d\n", strlen (tokens));
 							tokens = strtok (NULL, " ");
+							int nr_card = atoi(tokens);
+							tokens = strtok (NULL, " ");
+							int pin = atoi (tokens);
+							printf ("PIN: %d\n", pin);
+							int find = find_card (client_list, user_count, nr_card);
+							if (find < 0){
+								sprintf (send_buffer, "%s", "-4 : Numar card inexistent");
+								send (i, send_buffer, strlen(send_buffer), 0);
+							}
+							else if (client_list[find].login == 0){
+								int pin_find = find_pin (client_list, user_count, pin);
+								if (pin_find < 0){
+									if (client_list[find].counter == 3){
+										client_list[find].login = 2;
+										sprintf (send_buffer, "%s", "-5 : Card Blocat");
+										send (i, send_buffer, strlen(send_buffer), 0);
+									}
+									else {
+										sprintf (send_buffer, "%s", "-3 : Pin incorect");
+										send (i, send_buffer, strlen(send_buffer), 0);
+										client_list[find].counter++;
+									}
+								}
+								else {
+									sprintf (send_buffer, "Welcome, %s %s!", client_list[find].fname, client_list[find].lname);
+									send (i, send_buffer, strlen(send_buffer), 0);
+									client_list[find].login = 1;
+									client_list[find].socket = i;
+								}
+							} 
+							else if (client_list[find].login == 1){
+								sprintf (send_buffer, "%s", "-2 : Sesiune deja deschisa");
+								send (i, send_buffer, strlen (send_buffer), 0);
+							}
+							else if (client_list[find].login == 2){
+								sprintf (send_buffer, "%s", "-5 : Card blocat");
+								send (i, send_buffer, strlen (send_buffer), 0);
+							}
 						}
-						send (i, buffer, strlen(buffer), 0);
-						
-					}
-				} 
-			}
+						else if (strcmp (tokens, "logout\n") == 0){
+							int socket_find = find_socket (client_list, user_count, i);
+							if (socket_find >= 0){
+								client_list[socket_find].socket = -1;
+								client_list[socket_find].login = 0;
+								sprintf (send_buffer, "%s", "Deconectare de la bancomat!");
+								send (i, send_buffer, strlen (send_buffer), 0);
+							}
+							else {
+								printf ("%d %d \n", socket_find, client_list[socket_find].socket);
+								sprintf (send_buffer, "%s", "-1 : Clientul nu este autentificat");
+								send (i, send_buffer, strlen (send_buffer), 0);
+							}
+						}
+						else if (strcmp (tokens, "listsold\n") == 0){
+							int socket_find = find_socket (client_list, user_count, i);
+							if (socket_find >= 0){
+								sprintf (send_buffer, "%.2f", client_list[socket_find].sold);
+								send (i, send_buffer, strlen (send_buffer), 0);
+							}
+							else{
+								sprintf (send_buffer, "%s", "-1 : Clientul nu este autentificat");
+								send (i, send_buffer, strlen (send_buffer), 0);
+							}
+						}
+						else if (strcmp (tokens, "getmoney") == 0){
+							int socket_find = find_socket (client_list, user_count, i);
+							if (socket_find >= 0){
+								tokens = strtok (NULL, " ");
+								int sum = atoi (tokens);
+								if (sum % 10 != 0){
+									sprintf (send_buffer, "%s", "-9 : Suma nu este multiplu de 10");
+									send (i, send_buffer, strlen (send_buffer), 0);
+								}
+								else if (sum > client_list[socket_find].sold){
+									sprintf (send_buffer, "%s", "-8 : Fonduri insuficiente");
+									send (i, send_buffer, strlen (send_buffer), 0);
+								}
+								else {
+									client_list[socket_find].sold -= sum;
+									sprintf (send_buffer, "Suma %d retrasa cu succes", sum);
+									send (i, send_buffer, strlen (send_buffer), 0); 
+								}
+							}
+							else{
+								sprintf (send_buffer, "%s", "-1 : Clientul nu este autentificat");
+								send (i, send_buffer, strlen (send_buffer), 0);
+							}
+						}
+						else if (strcmp (tokens, "putmoney") == 0){
+							int socket_find = find_socket (client_list, user_count, i);
+							if (socket_find >= 0){
+								tokens = strtok (NULL, " ");
+								float sum = atof (tokens);
+								client_list[socket_find].sold += sum;
+								sprintf (send_buffer, "%s", "Suma depusa cu succes");
+								send (i, send_buffer, strlen (send_buffer), 0);
+							}
+							else{
+								sprintf (send_buffer, "%s", "-1 : Clientul nu este autentificat");
+								send (i, send_buffer, strlen (send_buffer), 0);
+							}
+						}
+						else if (strcmp (tokens, "Quitting") == 0){
+							int socket_find = find_socket (client_list, user_count, i);
+							if (socket_find >= 0){
+								client_list[socket_find].socket = -1;
+								client_list[socket_find].login = 0;
+							}
+							printf("Client disconnected", i);
+							close(i); 
+							FD_CLR(i, &read_fds);
+
+						}
+						else {
+							printf ("\n");
+							printf ("%d\n", strlen (tokens));
+							printf ("%d\n", strcmp (tokens, "logout\n") );
+							printf ("EEELSE\n");
+						}
+					}					
+				}
+			} 
 		}
-     }
+	}
+
 
 
      close(sockfd);

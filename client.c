@@ -54,14 +54,24 @@ int main(int argc, char *argv[])
     	memset(buffer, 0 , BUFLEN);
     	fgets(buffer, BUFLEN-1, stdin);
 
+        if (strcmp (buffer, "quit\n") == 0){
+            memset (buffer, 0, BUFLEN);
+            sprintf (buffer, "%s", "Quitting");
+            send(sockfd,buffer,strlen(buffer), 0);
+            break;
+        }
+
     	//trimit mesaj la server
     	n = send(sockfd,buffer,strlen(buffer), 0);
     	if (n < 0) 
         	 error("ERROR writing to socket");
         memset (buffer, 0, BUFLEN);
         n = recv (sockfd, buffer, sizeof(buffer), 0);
-        printf ("Am primit de la server , mesajul: %s\n", buffer);
+        fprintf (log_file, "ATM> %s\n", buffer);
+        printf ("ATM> %s\n", buffer);
     }
+
+    fclose (log_file);
     return 0;
 }
 
