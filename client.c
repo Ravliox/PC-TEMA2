@@ -4,7 +4,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netdb.h> 
+#include <netdb.h>
+#include <unistd.h> 
 
 #define BUFLEN 256
 
@@ -19,6 +20,16 @@ int main(int argc, char *argv[])
     int sockfd, n;
     struct sockaddr_in serv_addr;
     struct hostent *server;
+
+    /* opening the log file */
+    char id_name[30] = "client-";
+    char pid_string[15];
+    int pid = getpid();     // pid of the process
+    sprintf (pid_string, "%d", pid);
+    strcat (id_name, pid_string);
+    strcat (id_name, ".log");
+    
+    FILE* log_file = fopen (id_name, "w");
 
     char buffer[BUFLEN];
     if (argc < 3) {

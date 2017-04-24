@@ -7,6 +7,16 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+typedef struct {
+	char fname[12];
+	char lname[12];
+	int card_no;
+	int pin;
+	char secret_pass[16];
+	float sold;
+	int login = 0; 
+} client;
+
 #define MAX_CLIENTS	5
 #define BUFLEN 256
 
@@ -21,7 +31,44 @@ int main(int argc, char *argv[])
      int sockfd, newsockfd, portno, clilen;
      char buffer[BUFLEN];
      struct sockaddr_in serv_addr, cli_addr;
-     int n, i, j;
+     int n, i, j, user_count, k;
+
+	 FILE* users_data_file = fopen ("users_data_file", "r");
+	 char* line = malloc (sizeof(char) * 100);
+	 fgets (line, 100, users_data_file);
+	 k = 0;
+	 user_count = atoi (line);
+	 client* client_list = malloc (sizeof(client) * user_count);
+	 while (k < user_count){
+		fgets (line, 100, users_data_file);
+		char** data = malloc (sizeof (char*) * 6);
+		for (int p = 0; p < 6; p++){
+			data[p] = malloc (sizeof(char) * 20);
+		}
+		int p = 0;
+		char* token = strtok (line, " ");
+		while (token != NULL){
+			strcpy (data[p], token);
+			p++;
+			token = strtok (NULL, " ");
+		}
+		strcpy (client_list[k].fname, data[0]);
+		strcpy (client_list[k].lname, data[1]);
+		client_list[k].card_no = atoi (data[2]);
+		client_list[k].pin = atoi (data[3]);
+		strcpy (client_list[k].secret_pass, data[4]);
+		client_list[k].sold = atof (data[5]);
+		k++; 
+	 }
+
+	 for (int p = 0; p < user_count; p++){
+		 printf ("%s ", client_list[p].fname);
+		 printf ("%s ", client_list[p].lname);
+		 printf ("%d ", client_list[p].card_no);
+		 printf ("%d ", client_list[p].pin);
+		 printf ("%s ", client_list[p].secret_pass);
+		 printf ("%f\n", client_list[p].sold);
+	 }
 
      fd_set read_fds;	//multimea de citire folosita in select()
      fd_set tmp_fds;	//multime folosita temporar 
@@ -99,9 +146,13 @@ int main(int argc, char *argv[])
 					
 					else { //recv intoarce >0
 						printf ("Am primit de la clientul de pe socketul %d, mesajul: %s\n", i, buffer);
+						char* tokens = strtok (buffer, " ");
+						while (tokens != NULL){
+							printf ("%s\n", tokens);
+							tokens = strtok (NULL, " ");
+						}
 						send (i, buffer, strlen(buffer), 0);
 						
-
 					}
 				} 
 			}
