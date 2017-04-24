@@ -1,0 +1,68 @@
+ISTRATE EDUARD
+322 CB
+TEMA 2
+
+Folosesc scheletul de lab 8.
+
+Pentru a salva datele din fisierul users_data_file, il vom parcurge si vom pune informatia de pe fiecare linie
+intr-un dublu array. Fiecare linie a acestuia fiind un token de pe linia fisierului. Dupa completarea unui astfel
+de dublu array vom prelucra informatia intr-o structura speciala ce va seta variabilele de stare necesare, si 
+ne va salva informatiile necesare pentru autentificare si tranzactii a fiecarui client.
+
+Login
+
+Pentru a face logarea mai intai verificam in vectorul de structuri pe care l-am creat anterior daca numarul de
+card exista deja. Daca exista, apoi se va verifica campul login. Valoarea acestuia indica ca nici o sesiune
+nu este pornita, valoarea 1 inseamna ca deja a fost logat pe un client, si valoarea 2 inseamna ca contul este blocat.
+Dupa verifiarea acestei variabile se va verifica pinul. Pinul va fi verificat cu cel de la clientul gasit anterior
+si se va proceda corespunzator corectitudinii acestuia. Dupa o verificare a unui pin se va verifica campul contor
+al fiecarui client. Daca acesta ajunge la 3 atunci acesta contul va fi blocat. Daca autentificarea este facuta corect
+atunci acesta va fi resetat.
+
+login 666000 2222
+ATM> -3 : Pin incorect
+
+login 666000 2222
+ATM> -3 : Pin incorect
+
+login 666000 2222
+ATM> -5 : Card Blocat
+
+unlock
+unlockUNLOCK> Trimite parola secreta
+
+qwerty
+UNLOCK > Client deblocat
+
+quit
+
+logout
+Pentru verificarea celorlalte comenzi, avem nevoie de certitutinea faptului ca stim carui client sa aplicam comanda.
+Astfel fiecare client va avea un camp socket, ce va specifica pe ce socket a fost deschis, camp ce va fi reinitializat
+cu -1 la deloghare. Acesta va fi si el cautat in lista de clienti. Daca acesta nu este gasit atunci avem o eroare
+de tip -1 si va fi afisat mesajul corespunzator pentru orice comanda in afara de login.
+
+Cand clientul este gasit dupa socket atunci comanda login ii va seta campul login la 0 si socketul la -1.
+
+listsold
+
+Listsold va verifica existenta clientului dupa socket, si va afisa campul sold al acestuia din vectorul de clienti.
+
+getmoney
+
+Getmoney va verifica suma data sa fie intre parametrii dati si dupa o va scadea din campul sold al clientului gasit.
+
+putmoney
+
+putmoney va verifica daca clientul este logat, si va adauga la campul sold suma data
+
+unlock
+
+Pentru unlock clientul va retine la fiecare cerere trimisa de login care a fost ultimul numar de card trimis. Acesta
+il va pune in buffer inainte de a-l trimite, unde serverul il va primi si va initia un dialog pentru parola secreta
+a acestuia pe care o verifica dupa campul secret_pas din clientul gasit dupa numarul card dat de client.
+
+quit
+
+pentru quit, clientul va trimite un mesaj serverului, urmand ca acesta sa fie deconectat de la server si socketul 
+lui sa fie inchis.
